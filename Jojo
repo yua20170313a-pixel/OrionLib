@@ -1259,29 +1259,120 @@ function ElementFunction:AddDropdown(DropdownConfig)
         InputBox.TextEditable = not state
     end
 
+function ElementFunction:AddDropdown(DropdownConfig)
+    DropdownConfig = DropdownConfig or {}
+    DropdownConfig.Name = DropdownConfig.Name or "Dropdown"
+    DropdownConfig.Options = DropdownConfig.Options or {}
+    DropdownConfig.Default = DropdownConfig.Default or ""
+    DropdownConfig.Callback = DropdownConfig.Callback or function() end
+    DropdownConfig.Flag = DropdownConfig.Flag or nil
+    DropdownConfig.Save = DropdownConfig.Save or false
+    DropdownConfig.Disabled = DropdownConfig.Disabled or false
+
+    local Dropdown = {
+        Value = DropdownConfig.Default,
+        Options = DropdownConfig.Options,
+        Buttons = {},
+        Toggled = false,
+        Save = DropdownConfig.Save,
+        Disabled = DropdownConfig.Disabled
+    }
+
+    local TweenInfoShort = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local MaxElements = 5
+
+    local Click = SetProps(MakeElement("Button"), {Size = UDim2.new(1,0,1,0)})
+
+    local DropdownBox = SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255,255,255),0,5), {
+        Size = UDim2.new(1,0,0,38),
+        Parent = ItemParent
+    }), {
+        AddThemeObject(SetProps(MakeElement("Label", DropdownConfig.Name, 15), {
+            Size = UDim2.new(1,-12,1,0),
+            Position = UDim2.new(0,12,0,0),
+            Font = Enum.Font.GothamBold,
+            Name = "Content"
+        }), "Text"),
+        Click
+    })
+
+    local SelectedLabel = AddThemeObject(SetProps(MakeElement("Label", Dropdown.Value, 13), {
+        Size = UDim2.new(1,-12,1,0),
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Position = UDim2.new(0,12,0,0)
+    }), "TextDark")
+    SelectedLabel.Parent = DropdownBox
+
+    local DropdownList = MakeElement("Frame")
+    DropdownList.Size = UDim2.new(1,0,0,0)
+    DropdownList.ClipsDescendants = true
+    DropdownList.Parent = DropdownBox
+
+    local function AddOptions(Options)
+        for _,Option in pairs(Options) do
+            local OptionBtn = MakeElement("Button", Option)
+            OptionBtn.Size = UDim2.new(1,0,0,28)
+            OptionBtn.BackgroundTransparency = 1
+            OptionBtn.Parent = DropdownList
+
+            OptionBtn.MouseButton1Click:Connect(function()
+                if Dropdown.Disabled then return end
+                Dropdown:Set(Option)
+                if DropdownConfig.Save then SaveCfg(game.GameId) end
+            end)
+
+            Dropdown.Buttons[Option] = OptionBtn
+        end
+    end
+
+    function Dropdown:Refresh(Options, Delete)
+        if Delete then
+            for _,v in pairs(Dropdown.Buttons) do v:Destroy() end
+            table.clear(Dropdown.Options)
+            table.clear(Dropdown.Buttons)
+        end
+        Dropdown.Options = Options
+        AddOptions(Dropdown.Options)
+    end
+
+    function Dropdown:Set(Value)
+        if not table.find(Dropdown.Options, Value) then
+            Dropdown.Value = "..."
+            SelectedLabel.Text = Dropdown.Value
+            return
+        end
+        Dropdown.Value = Value
+        SelectedLabel.Text = Dropdown.Value
+        DropdownConfig.Callback(Dropdown.Value)
+    end
+
+    function Dropdown:SetDisabled(state)
+        Dropdown.Disabled = state
+        for _,v in pairs(Dropdown.Buttons) do v.Active = not state end
+    end
+
     function Dropdown:Reset()
         Dropdown:Set(DropdownConfig.Default)
     end
 
     -- 開閉アニメーション
-    SelectedLabel.InputBegan:Connect(function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            Dropdown.Toggled = not Dropdown.Toggled
-            local size = #Dropdown.Options > MaxElements and (MaxElements*28+28*2) or (#Dropdown.Options*28 + 28*2)
-            TweenService:Create(DropdownContainer,TweenInfoShort,{Size = Dropdown.Toggled and UDim2.new(1,0,0,size) or UDim2.new(1,0,0,56)}):Play()
-        end
+    Click.MouseButton1Click:Connect(function()
+        Dropdown.Toggled = not Dropdown.Toggled
+        local size = #Dropdown.Options > MaxElements and (MaxElements*28) or (#Dropdown.Options*28)
+        TweenService:Create(DropdownList, TweenInfoShort, {
+            Size = Dropdown.Toggled and UDim2.new(1,0,0,size) or UDim2.new(1,0,0,0)
+        }):Play()
     end)
 
     -- 初期表示
     Dropdown:Refresh(Dropdown.Options, false)
     Dropdown:Set(Dropdown.Value)
 
-    -- Flags 登録
     if DropdownConfig.Flag then
         OrionLib.Flags[DropdownConfig.Flag] = Dropdown
     end
 
-    return Dropdown, DropdownContainer, InputBox, SelectedLabel
+    return Dropdown, DropdownBox
 end
 			function ElementFunction:AddBind(BindConfig)
 				BindConfig.Name = BindConfig.Name or "Bind"
